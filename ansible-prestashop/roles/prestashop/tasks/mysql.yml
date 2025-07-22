@@ -23,83 +23,73 @@
   become: yes
   tags: mysql
 
-# 1. Create admin user with minimal privileges first
-- name: Create admin user with USAGE privileges
-  mysql_user:
+# 1. Create admin user with NO privileges using direct SQL
+- name: Create admin user via SQL
+  mysql_query:
     login_unix_socket: /var/run/mysqld/mysqld.sock
-    name: "admin"
-    password: "{{ prestashop_mysql_root_password }}"
-    host: "localhost"
-    priv: ".:USAGE"
-    state: present
+    query: |
+      CREATE USER IF NOT EXISTS 'admin'@'localhost' IDENTIFIED BY '{{ prestashop_mysql_root_password }}';
+      FLUSH PRIVILEGES;
   #no_log: true
   become: yes
   tags: mysql
 
-# 2. Grant privileges using properly formatted SQL
-- name: Grant full privileges (correct syntax)
+# 2. Grant privileges using direct SQL
+- name: Grant full privileges via SQL
   mysql_query:
     login_unix_socket: /var/run/mysqld/mysqld.sock
     query: |
       GRANT ALL PRIVILEGES ON . TO 'admin'@'localhost';
       GRANT GRANT OPTION ON . TO 'admin'@'localhost';
       FLUSH PRIVILEGES;
-  no_log: true
+  #no_log: true
   become: yes
   tags: mysql
 
 # [Rest of your tasks...]
 - name: Remove insecure defaults
-  mysql_user:
+  mysql_query:
     login_user: "admin"
     login_password: "{{ prestashop_mysql_root_password }}"
-    name: ""
-    host: "localhost"
-    state: absent
+    query: |
+      DELETE FROM mysql.user WHERE User = '';
+      FLUSH PRIVILEGES;
   #no_log: true
   become: yes
   tags: mysql
 
 - name: Remove test database
-  mysql_db:
+  mysql_query:
     login_user: "admin"
     login_password: "{{ prestashop_mysql_root_password }}"
-    name: "test"
-    state: absent
+    query: |
+      DROP DATABASE IF EXISTS test;
+      FLUSH PRIVILEGES;
   #no_log: true
   become: yes
   tags: mysql
 
 - name: Create PrestaShop database
-  mysql_db:
+  mysql_query:
     login_user: "admin"
     login_password: "{{ prestashop_mysql_root_password }}"
-    name: "{{ prestashop_db_name }}"
-    encoding: utf8mb4
-    collation: utf8mb4_unicode_ci
-    state: present
-  no_log: true
+    query: |
+      CREATE DATABASE IF NOT EXISTS {{ prestashop_db_name }}
+      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  #no_log: true
   become: yes
   tags: database
 
 - name: Create application user
-  mysql_user:
-    login_user: "admin"
-    login_password: "{{ prestashop_mysql_root_password }}"
-    name: "{{ prestashop_admin_db_user }}"
-    password: "{{ prestashop_admin_db_password }}"
-    host: "%"
-    priv: "{{ prestashop_db_name }}.*:ALL"
-    state: present
-  no_log: true
-  become: yes
-  tags: database
-
-- name: Apply privilege changes
   mysql_query:
     login_user: "admin"
     login_password: "{{ prestashop_mysql_root_password }}"
-    query: "FLUSH PRIVILEGES"
-  no_log: true
+    query: |
+      CREATE USER IF NOT EXISTS '{{ prestashop_admin_db_user }}'@'%'
+      IDENTIFIED BY '{{ prestashop_admin_db_password }}';
+      GRANT ALL PRIVILEGES ON {{ prestashop_db_name }}.*
+      TO '{{ prestashop_admin_db_user }}'@'%';
+      FLUSH PRIVILEGES;
+  #no_log: true
   become: yes
   tags: database
