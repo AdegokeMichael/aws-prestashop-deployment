@@ -1,6 +1,6 @@
 variable "region" {
-	description = "The AWS region where resources will be deployed"
-	type = string
+  description = "The AWS region where resources will be deployed"
+  type        = string
 }
 
 variable "vpc_id" {
@@ -10,26 +10,21 @@ variable "vpc_id" {
 
 
 variable "instance_type" {
-	description = "EC2 instance type"
-	type = string
+  description = "EC2 instance type"
+  type        = string
 }
 
 variable "ami_id" {
-	description = "The AMI ID for the EC2 instance"
-	type = string
+  description = "The AMI ID for the EC2 instance"
+  type        = string
 }
 
 variable "key_name" {
-	description = "EC2 key pair name"
-	type = string
+  description = "EC2 key pair name"
+  type        = string
 }
 
 variable "private_key_path" {
-	description = "path to your public key path"
-	type = string
-}
-
-variable "vpc_id" {
-	description = "The ID of the VPC attached to the security group"
-	type = string
+  description = "path to your public key path"
+  type        = string
 }
