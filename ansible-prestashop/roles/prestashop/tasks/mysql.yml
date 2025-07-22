@@ -1,5 +1,4 @@
 ---
-
 - name: Install MySQL Server
   apt:
     name: mysql-server
@@ -20,99 +19,65 @@
     name: python3-pymysql
     state: present
   become: yes
-  register: pymysql_install
-  until: pymysql_install is succeeded
-  retries: 3
-  delay: 10
   tags: mysql
 
-- name: Verify PyMySQL installation
-  command: python3 -c "import pymysql"
-  become: yes
+- name: Capture auto-generated root password (Ubuntu 20.04+)
+  shell: |
+    sudo grep -oP 'temporary password(.*): \K(.+)' /var/log/mysqld.log || 
+    echo "{{ prestashop_mysql_root_password }}"
+  register: mysql_temp_password
   changed_when: false
+  no_log: true
+  become: yes
   tags: mysql
 
-# Secure MySQL installation using native Ansible modules
-- name: Verify MySQL installation
-  command: which mysqld
-  register: mysql_installed
-  changed_when: false
-  ignore_errors: yes
-
-- name: Ensure MySQL service is running
-  service:
-    name: mysql
-    state: started
-    enabled: yes
+- name: Set permanent root password
+  mysql_user:
+    login_user: root
+    login_password: "{{ mysql_temp_password.stdout }}"
+    name: root
+    password: "{{ prestashop_mysql_root_password }}"
+    host: localhost
+    plugin: mysql_native_password
+    state: present
+  no_log: true
   become: yes
-  when: mysql_installed.rc == 0
+  tags: mysql
 
-# --> START OF NEW PASSWORD SETUP BLOCK <--
-- name: Set MySQL root password (universal method)
-  block:
-    - name: Attempt passwordless root access
-      mysql_user:
-        login_user: root
-        login_password: ""
-        name: root
-        password: "{{ prestashop_mysql_root_password }}"
-        host: localhost
-        plugin: mysql_native_password
-        state: present
-      #no_log: true
-      become: yes
-      register: auth_attempt1
-      ignore_errors: yes
+- name: Remove insecure defaults
+  mysql_user:
+    login_user: root
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: ""
+    host: localhost
+    state: absent
+  no_log: true
+  become: yes
+  tags: mysql
 
-    - name: Force reset via command if needed
-      command: >
-        mysql -e
-        "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ prestashop_mysql_root_password }}';
-        FLUSH PRIVILEGES;"
-      #no_log: true
-      become: yes
-      register: auth_attempt2
-      ignore_errors: yes
-      when: auth_attempt1 is failed
+- name: Remove test database
+  mysql_db:
+    login_user: root
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: test
+    state: absent
+  no_log: true
+  become: yes
+  tags: mysql
 
-    - name: Emergency reset if all else fails
-      command: >
-        sudo systemctl stop mysql &&
-        sudo mysqld_safe --skip-grant-tables &
-        sleep 5 &&
-        mysql -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ prestashop_mysql_root_password }}';" &&
-        sudo pkill mysqld_safe &&
-        sudo systemctl start mysql
-      #no_log: true
-      become: yes
-      when: auth_attempt2 is failed
-
-    - name: Verify root access
-      command: >
-        mysql -u root -p"{{ prestashop_mysql_root_password }}"
-        -e "SELECT 1"
-      changed_when: false
-      #no_log: true
-      become: yes
-      register: root_check
-      failed_when: root_check.rc != 0
-  when: mysql_installed.rc == 0
-# --> END OF NEW PASSWORD SETUP BLOCK <--
-
-# PrestaShop database setup
-- name: Create Prestashop Database
+- name: Create PrestaShop database
   mysql_db:
     login_user: root
     login_password: "{{ prestashop_mysql_root_password }}"
     name: "{{ prestashop_db_name }}"
-    state: present
     encoding: utf8mb4
     collation: utf8mb4_unicode_ci
+    state: present
   no_log: true
   become: yes
   tags: database
 
-- name: Create MySQL user for Prestashop
+- name: Create application database user
   mysql_user:
     login_user: root
     login_password: "{{ prestashop_mysql_root_password }}"
@@ -125,7 +90,7 @@
   become: yes
   tags: database
 
-- name: Flush privileges
+- name: Apply privilege changes
   mysql_query:
     login_user: root
     login_password: "{{ prestashop_mysql_root_password }}"
@@ -133,23 +98,3 @@
   no_log: true
   become: yes
   tags: database
-
-# Verification tasks
-- name: Verify MySQL root access
-  command: >
-    mysql -u root -p"{{ prestashop_mysql_root_password }}"
-    -e "SELECT 1"
-  changed_when: false
-  no_log: true
-  become: yes
-  tags: verify
-
-- name: Verify Prestashop database user
-  command: >
-    mysql -u "{{ prestashop_admin_db_user }}"
-    -p"{{ prestashop_admin_db_password }}"
-    -e "SHOW DATABASES"
-  changed_when: false
-  no_log: true
-  become: yes
-  tags: verify
