@@ -1,3 +1,5 @@
-region = "us-east-1"
-instance_type = "t3.micro"
-key_name = "msb"
+region           = "us-east-1"
+instance_type    = "t3.micro"
+ami_id           = "ami-020cba7c55df1f615"
+key_name         = "testkey"
+private_key_path = "C:/Users/hp/Downloads/testkey.pem"
