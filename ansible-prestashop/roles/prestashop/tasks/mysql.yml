@@ -23,69 +23,40 @@
   become: yes
   tags: mysql
 
-# 1. Create admin user with NO privileges using direct SQL
-- name: Create admin user via SQL
-  community.mysql.mysql_query:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
-    query:
-      - "CREATE USER IF NOT EXISTS 'admin'@'localhost' IDENTIFIED BY '{{ prestashop_mysql_root_password }}';"
-      - "FLUSH PRIVILEGES;"
-  #no_log: true
-  become: yes
-  tags: mysql
-
-# 2. Grant privileges using direct SQL
-- name: Grant full privileges via SQL
-  community.mysql.mysql_query:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
-    query:
-      - "GRANT ALL PRIVILEGES ON . TO 'admin'@'localhost';"
-      - "GRANT GRANT OPTION ON . TO 'admin'@'localhost';"
-      - "FLUSH PRIVILEGES;"
-  #no_log: true
-  become: yes
-  tags: mysql
-
-# [Rest of your tasks...]
-- name: Remove insecure defaults
-  community.mysql.mysql_query:
-    login_user: "admin"
-    login_password: "{{ prestashop_mysql_root_password }}"
-    query:
-      - "DELETE FROM mysql.user WHERE User = '';"
-      - "FLUSH PRIVILEGES;"
-  #no_log: true
-  become: yes
-  tags: mysql
-
-- name: Remove test database
-  community.mysql.mysql_query:
-    login_user: "admin"
-    login_password: "{{ prestashop_mysql_root_password }}"
-    query:
-      - "DROP DATABASE IF EXISTS test;"
-      - "FLUSH PRIVILEGES;"
-  #no_log: true
-  become: yes
-  tags: mysql
-
+# Create dedicated PrestaShop database (no admin user needed)
 - name: Create PrestaShop database
   community.mysql.mysql_query:
-    login_user: "admin"
-    login_password: "{{ prestashop_mysql_root_password }}"
-    query: "CREATE DATABASE IF NOT EXISTS {{ prestashop_db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-  #no_log: true
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: |
+      CREATE DATABASE IF NOT EXISTS {{ prestashop_db_name }}
+      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   become: yes
   tags: database
 
-- name: Create application user
+- name: Create application user with limited privileges
   community.mysql.mysql_query:
-    login_user: "admin"
-    login_password: "{{ prestashop_mysql_root_password }}"
-    query:
-      - "CREATE USER IF NOT EXISTS '{{ prestashop_admin_db_user }}'@'%' IDENTIFIED BY '{{ prestashop_admin_db_password }}';"
-      - "GRANT ALL PRIVILEGES ON {{ prestashop_db_name }}.* TO '{{ prestashop_admin_db_user }}'@'%';"
-      - "FLUSH PRIVILEGES;"
-  #no_log: true
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: |
+      CREATE USER IF NOT EXISTS '{{ prestashop_db_user }}'@'localhost'
+      IDENTIFIED BY '{{ prestashop_db_password }}';
+      
+      GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP,
+      REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE,
+      CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE
+      ON {{ prestashop_db_name }}.*
+      TO '{{ prestashop_db_user }}'@'localhost';
+      
+      FLUSH PRIVILEGES;
   become: yes
   tags: database
+
+# Optional security hardening
+- name: Remove insecure defaults
+  community.mysql.mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: |
+      DELETE FROM mysql.user WHERE User = '';
+      DROP DATABASE IF EXISTS test;
+      FLUSH PRIVILEGES;
+  become: yes
+  tags: mysql
