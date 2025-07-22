@@ -2,8 +2,22 @@
 
 - name: Install MySQL Server
   apt:
-    name: my-sql-server
+    name: mysql-server
     state: present
+
+- name: Secure MySQL installation
+  shell: |
+    sudo mysql_secure_installation <<EOF
+    n
+    n
+    n
+    y
+    y
+    y
+    y
+    EOF
+  become: yes
+  when: "'mysql-server' in ansible_facts.packages"    
 
 - name: Start MySQL Service
   service:
