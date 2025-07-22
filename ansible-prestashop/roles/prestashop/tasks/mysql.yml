@@ -23,31 +23,32 @@
   become: yes
   tags: mysql
 
-# 1. FIRST create admin user with NO privileges
-- name: Create empty admin user
+# 1. Create admin user with minimal privileges first
+- name: Create admin user with USAGE privileges
   mysql_user:
     login_unix_socket: /var/run/mysqld/mysqld.sock
     name: "admin"
     password: "{{ prestashop_mysql_root_password }}"
     host: "localhost"
+    priv: ".:USAGE"
     state: present
-  #no_log: true
+  no_log: true
   become: yes
   tags: mysql
 
-# 2. THEN grant privileges via RAW SQL (guaranteed to work)
-- name: Grant full privileges via SQL
+# 2. Grant privileges using properly formatted SQL
+- name: Grant full privileges (correct syntax)
   mysql_query:
     login_unix_socket: /var/run/mysqld/mysqld.sock
     query: |
-      GRANT ALL PRIVILEGES ON . TO 'admin'@'localhost' 
-      WITH GRANT OPTION;
+      GRANT ALL PRIVILEGES ON . TO 'admin'@'localhost';
+      GRANT GRANT OPTION ON . TO 'admin'@'localhost';
       FLUSH PRIVILEGES;
-  #no_log: true
+  no_log: true
   become: yes
   tags: mysql
 
-# [Rest of your tasks remain unchanged...]
+# [Rest of your tasks...]
 - name: Remove insecure defaults
   mysql_user:
     login_user: "admin"
@@ -55,7 +56,7 @@
     name: ""
     host: "localhost"
     state: absent
-  #no_log: true
+  no_log: true
   become: yes
   tags: mysql
 
@@ -65,7 +66,7 @@
     login_password: "{{ prestashop_mysql_root_password }}"
     name: "test"
     state: absent
-  #no_log: true
+  no_log: true
   become: yes
   tags: mysql
 
@@ -77,7 +78,7 @@
     encoding: utf8mb4
     collation: utf8mb4_unicode_ci
     state: present
-  #no_log: true
+  no_log: true
   become: yes
   tags: database
 
@@ -90,7 +91,7 @@
     host: "%"
     priv: "{{ prestashop_db_name }}.*:ALL"
     state: present
-  #no_log: true
+  no_log: true
   become: yes
   tags: database
 
@@ -99,6 +100,6 @@
     login_user: "admin"
     login_password: "{{ prestashop_mysql_root_password }}"
     query: "FLUSH PRIVILEGES"
-  #no_log: true
+  no_log: true
   become: yes
   tags: database
