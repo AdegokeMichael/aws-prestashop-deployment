@@ -1,0 +1,3 @@
+---
+pretashop_mysql_root_password: "MyStrongPassword123"
+prestashop_db_name: "prestashop"

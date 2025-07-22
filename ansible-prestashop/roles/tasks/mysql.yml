@@ -1,0 +1,36 @@
+---
+
+- name: Install MySQL Server
+  apt:
+    name: my-sql-server
+    state: present
+
+- name: Start MySQL Service
+  service:
+    name: mysql
+    state: started
+    enabled: true
+
+- name: Set MySQL Root Password
+  mysql_user:
+    login_user: root
+    name: root
+    password: "{{ prestashop_mysql_root_pssword }}"
+    host_all: true
+    state: present
+
+- name: Create Prestashop Database
+  mysql_db:
+    login_user: root
+    login_password: "{{prestashop_mysql_root_password}}"
+    name: "{{prestashop_db_name}}"
+    state: present
+
+- name: Create MySQL user '{{prestashop_admin_db_user}}' with privileges on Prestashop database
+  mysql_user:
+    login_user: root
+    login_password: "{{prestashop_mysql_root_password}}"
+    name: "{{prestashop_admin_db_user}}"
+    password: "{{prestashop_admin_db_password}}"
+    priv: "{{prestashop_db_name}}.*:ALL"
+    state: present

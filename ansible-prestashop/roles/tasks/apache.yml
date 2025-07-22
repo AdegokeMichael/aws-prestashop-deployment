@@ -1,0 +1,17 @@
+---
+
+- name: Install Apache2
+  apt:
+    name: apache2
+    state: present
+
+- name: Enable Apache Restart Module
+  apache2_module:
+    name: rewrite
+    state: present
+
+- name: Ensure Apache is running
+  service:
+    name: Apache2
+    state: started
+    enabled: true

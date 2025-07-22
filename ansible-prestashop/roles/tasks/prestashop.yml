@@ -1,0 +1,24 @@
+---
+- name: Download Prestashop
+  get_url:
+    url:
+      https://download.prestashop.com/download/releases/prestashop_8.1.2.zip
+    dest: /tmp/prestashop.zip
+
+- name: Unzip Prestashop
+  unarchive:
+    src: /tmp/prestashop.zip
+    dest: /var/www/html/
+    remote_src: yes
+    extra_opts: ["-o"]
+
+- name: Set Permissions
+  file: 
+    path: /var/www/html/
+    recurse: yes
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Restart Apache 
+  meta: fluh_handlers

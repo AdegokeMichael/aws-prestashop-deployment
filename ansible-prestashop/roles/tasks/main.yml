@@ -1,0 +1,13 @@
+---
+
+- name: Include Apache Setup
+  include_tasks: apache.yml
+
+- name: Include PHP Setup
+  include_tasks: php.yml
+
+- name: Include MySQL Setup
+  include_tasks: mysql.yml
+
+- name: Include Prestashop Setup
+  include_tasks: pretashop.yml
