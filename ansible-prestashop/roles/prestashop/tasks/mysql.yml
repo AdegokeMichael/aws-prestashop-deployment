@@ -1,5 +1,4 @@
 ---
-# roles/prestashop/tasks/mysql.yml
 
 - name: Install MySQL Server
   apt:
@@ -23,46 +22,26 @@
   become: yes
   tags: mysql
 
-# Critical change for modern MySQL installations
-- name: Configure root authentication
-  block:
-    - name: Check if root has password
-      command: mysql -u root -e "SELECT 1"
-      register: root_access
-      ignore_errors: yes
-      changed_when: false
-      become: yes
-
-    - name: Set root password (when no password exists)
-      mysql_user:
-        login_unix_socket: /var/run/mysqld/mysqld.sock
-        name: root
-        password: "{{ prestashop_mysql_root_password }}"
-        host: localhost
-        plugin: mysql_native_password
-        state: present
-      when: root_access.rc != 0
-      no_log: true
-      become: yes
-
-    - name: Update root password (when password exists)
-      mysql_user:
-        login_user: root
-        login_password: "{{ prestashop_mysql_root_password }}"
-        name: root
-        password: "{{ prestashop_mysql_root_password }}"
-        host: localhost
-        state: present
-      when: root_access.rc == 0
-      no_log: true
-      become: yes
-  tags: mysql
-
-- name: Remove insecure defaults
+# Critical change - Create admin user via socket auth
+- name: Create administrative user (full privileges)
   mysql_user:
     login_unix_socket: /var/run/mysqld/mysqld.sock
+    name: "admin"
+    password: "{{ prestashop_mysql_root_password }}"
+    host: "localhost"
+    priv: ".:ALL,GRANT"
+    state: present
+  no_log: true
+  become: yes
+  tags: mysql
+
+# Now use the admin user for all subsequent tasks
+- name: Remove insecure defaults
+  mysql_user:
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
     name: ""
-    host: localhost
+    host: "localhost"
     state: absent
   no_log: true
   become: yes
@@ -70,8 +49,9 @@
 
 - name: Remove test database
   mysql_db:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
-    name: test
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: "test"
     state: absent
   no_log: true
   become: yes
@@ -79,7 +59,8 @@
 
 - name: Create PrestaShop database
   mysql_db:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
     name: "{{ prestashop_db_name }}"
     encoding: utf8mb4
     collation: utf8mb4_unicode_ci
@@ -88,9 +69,10 @@
   become: yes
   tags: database
 
-- name: Create application database user
+- name: Create application user
   mysql_user:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
     name: "{{ prestashop_admin_db_user }}"
     password: "{{ prestashop_admin_db_password }}"
     host: "%"
@@ -102,7 +84,8 @@
 
 - name: Apply privilege changes
   mysql_query:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
     query: "FLUSH PRIVILEGES"
   no_log: true
   become: yes
