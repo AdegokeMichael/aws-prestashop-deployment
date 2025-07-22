@@ -65,8 +65,113 @@
     name: "{{ prestashop_db_name }}"
     encoding: utf8mb4
     collation: utf8mb4_unicode_ci
+    state: pr---
+# roles/prestashop/tasks/mysql.yml
+
+- name: Install MySQL Server
+  apt:
+    name: mysql-server
     state: present
+  become: yes
+  tags: mysql
+
+- name: Ensure MySQL service is running
+  service:
+    name: mysql
+    state: started
+    enabled: yes
+  become: yes
+  tags: mysql
+
+- name: Install MySQL Python client
+  apt:
+    name: python3-pymysql
+    state: present
+  become: yes
+  tags: mysql
+
+# 1. FIRST create admin user with minimal privileges
+- name: Create admin user with basic privileges
+  mysql_user:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    name: "admin"
+    password: "{{ prestashop_mysql_root_password }}"
+    host: "localhost"
+    priv: ".:USAGE"  # Minimal initial privileges
+    state: present
+  #no_log: true
+  become: yes
+  tags: mysql
+
+# 2. THEN grant full privileges separately (works around MySQL syntax quirk)
+- name: Grant full privileges to admin user
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: |
+      GRANT ALL PRIVILEGES ON . TO 'admin'@'localhost' 
+      IDENTIFIED BY '{{ prestashop_mysql_root_password }}' 
+      WITH GRANT OPTION;
+      FLUSH PRIVILEGES;
+  #no_log: true
+  become: yes
+  tags: mysql
+
+# [Rest of your tasks using the admin user...]
+- name: Remove insecure defaults
+  mysql_user:
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: ""
+    host: "localhost"
+    state: absent
+  #no_log: true
+  become: yes
+  tags: mysql
+
+- name: Remove test database
+  mysql_db:
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: "test"
+    state: absent
+  #no_log: true
+  become: yes
+  tags: mysql
+
+- name: Create PrestaShop database
+  mysql_db:
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: "{{ prestashop_db_name }}"
+    encoding: utf8mb4
+    collation: utf8mb4_unicode_ci
+    state: present
+  #no_log: true
+  become: yes
+  tags: database
+
+- name: Create application user
+  mysql_user:
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: "{{ prestashop_admin_db_user }}"
+    password: "{{ prestashop_admin_db_password }}"
+    host: "%"
+    priv: "{{ prestashop_db_name }}.*:ALL"
+    state: present
+  #no_log: true
+  become: yes
+  tags: database
+
+- name: Apply privilege changes
+  mysql_query:
+    login_user: "admin"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    query: "FLUSH PRIVILEGES"
   no_log: true
+  become: yes
+  tags: databaseesent
+  #no_log: true
   become: yes
   tags: database
 
@@ -79,7 +184,7 @@
     host: "%"
     priv: "{{ prestashop_db_name }}.*:ALL,GRANT"  # Specific to PrestaShop DB
     state: present
-  no_log: true
+  #no_log: true
   become: yes
   tags: database
 
@@ -88,6 +193,6 @@
     login_user: "admin"
     login_password: "{{ prestashop_mysql_root_password }}"
     query: "FLUSH PRIVILEGES"
-  no_log: true
+  #no_log: true
   become: yes
   tags: database
