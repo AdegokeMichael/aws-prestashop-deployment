@@ -10,4 +10,4 @@
   include_tasks: mysql.yml
 
 - name: Include Prestashop Setup
-  include_tasks: pretashop.yml
+  include_tasks: prestashop.yml
