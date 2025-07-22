@@ -59,7 +59,7 @@
         host: localhost
         plugin: mysql_native_password
         state: present
-      no_log: true
+      #no_log: true
       become: yes
       register: auth_attempt1
       ignore_errors: yes
@@ -69,7 +69,7 @@
         mysql -e
         "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ prestashop_mysql_root_password }}';
         FLUSH PRIVILEGES;"
-      no_log: true
+      #no_log: true
       become: yes
       register: auth_attempt2
       ignore_errors: yes
@@ -92,7 +92,7 @@
         mysql -u root -p"{{ prestashop_mysql_root_password }}"
         -e "SELECT 1"
       changed_when: false
-      no_log: true
+      #no_log: true
       become: yes
       register: root_check
       failed_when: root_check.rc != 0
