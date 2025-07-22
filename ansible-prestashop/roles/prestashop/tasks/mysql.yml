@@ -24,13 +24,30 @@
     state: started
     enabled: true
 
+- name: Install MySQL Python client
+  apt:
+    name: python3-pymysql
+    state: present
+  become: yes
+  register: pymysql_install
+  until: pymysql_install is succeeded
+  retries: 3
+  delay: 10
+
+- name: Verify PyMySQL installation
+  command: python3 -c "import pymysql"
+  become: yes
+  changed_when: false
+
 - name: Set MySQL Root Password
-  mysql_user:
-    login_user: root
+  mysql_user:  # MUST be lowercase
+    login_unix_socket: /var/run/mysqld/mysqld.sock  # Critical addition
     name: root
     password: "{{ prestashop_mysql_root_password }}"
     host_all: true
     state: present
+  no_log: true
+  become: yes
 
 - name: Create Prestashop Database
   mysql_db:
