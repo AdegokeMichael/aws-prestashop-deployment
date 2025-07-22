@@ -32,7 +32,7 @@
     host: "localhost"
     priv: ".:ALL,GRANT"  # Fixed privilege syntax
     state: present
-  no_log: true
+  #no_log: true
   become: yes
   tags: mysql
 
@@ -44,7 +44,7 @@
     name: ""
     host: "localhost"
     state: absent
-  no_log: true
+  #no_log: true
   become: yes
   tags: mysql
 
@@ -54,7 +54,7 @@
     login_password: "{{ prestashop_mysql_root_password }}"
     name: "test"
     state: absent
-  no_log: true
+  #no_log: true
   become: yes
   tags: mysql
 
