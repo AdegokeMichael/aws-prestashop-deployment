@@ -21,4 +21,4 @@
     mode: '0755'
 
 - name: Restart Apache 
-  meta: fluh_handlers
+  meta: flush_handlers
