@@ -40,7 +40,7 @@
     host: localhost
     plugin: mysql_native_password
     state: present
-  no_log: true
+  #no_log: true
   become: yes
   tags: mysql
 
