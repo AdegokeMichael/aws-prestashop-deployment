@@ -33,48 +33,71 @@
   tags: mysql
 
 # Secure MySQL installation using native Ansible modules
-- name: Set root password via socket (initial setup)
-  mysql_user:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
-    name: root
-    password: "{{ prestashop_mysql_root_password }}"
-    host: localhost
-    state: present
-  #no_log: true
-  become: yes
-  tags: mysql
+- name: Verify MySQL installation
+  command: which mysqld
+  register: mysql_installed
+  changed_when: false
+  ignore_errors: yes
 
-- name: Remove anonymous users
-  mysql_user:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
-    name: ''
-    host: localhost
-    state: absent
-  no_log: true
+- name: Ensure MySQL service is running
+  service:
+    name: mysql
+    state: started
+    enabled: yes
   become: yes
-  tags: mysql
+  when: mysql_installed.rc == 0
 
-- name: Remove test database
-  mysql_db:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
-    name: test
-    state: absent
-  no_log: true
-  become: yes
-  tags: mysql
+# --> START OF NEW PASSWORD SETUP BLOCK <--
+- name: Set MySQL root password (universal method)
+  block:
+    - name: Attempt passwordless root access
+      mysql_user:
+        login_user: root
+        login_password: ""
+        name: root
+        password: "{{ prestashop_mysql_root_password }}"
+        host: localhost
+        plugin: mysql_native_password
+        state: present
+      no_log: true
+      become: yes
+      register: auth_attempt1
+      ignore_errors: yes
 
-- name: Disable remote root login
-  mysql_user:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
-    name: root
-    host: "%"
-    state: absent
-  no_log: true
-  become: yes
-  tags: mysql
+    - name: Force reset via command if needed
+      command: >
+        mysql -e
+        "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ prestashop_mysql_root_password }}';
+        FLUSH PRIVILEGES;"
+      no_log: true
+      become: yes
+      register: auth_attempt2
+      ignore_errors: yes
+      when: auth_attempt1 is failed
+
+    - name: Emergency reset if all else fails
+      command: >
+        sudo systemctl stop mysql &&
+        sudo mysqld_safe --skip-grant-tables &
+        sleep 5 &&
+        mysql -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ prestashop_mysql_root_password }}';" &&
+        sudo pkill mysqld_safe &&
+        sudo systemctl start mysql
+      no_log: true
+      become: yes
+      when: auth_attempt2 is failed
+
+    - name: Verify root access
+      command: >
+        mysql -u root -p"{{ prestashop_mysql_root_password }}"
+        -e "SELECT 1"
+      changed_when: false
+      no_log: true
+      become: yes
+      register: root_check
+      failed_when: root_check.rc != 0
+  when: mysql_installed.rc == 0
+# --> END OF NEW PASSWORD SETUP BLOCK <--
 
 # PrestaShop database setup
 - name: Create Prestashop Database
