@@ -1,4 +1,6 @@
 ---
+# roles/prestashop/tasks/mysql.yml
+
 - name: Install MySQL Server
   apt:
     name: mysql-server
@@ -21,33 +23,44 @@
   become: yes
   tags: mysql
 
-- name: Capture auto-generated root password (Ubuntu 20.04+)
-  shell: |
-    sudo grep -oP 'temporary password(.*): \K(.+)' /var/log/mysqld.log || 
-    echo "{{ prestashop_mysql_root_password }}"
-  register: mysql_temp_password
-  changed_when: false
-  no_log: true
-  become: yes
-  tags: mysql
+# Critical change for modern MySQL installations
+- name: Configure root authentication
+  block:
+    - name: Check if root has password
+      command: mysql -u root -e "SELECT 1"
+      register: root_access
+      ignore_errors: yes
+      changed_when: false
+      become: yes
 
-- name: Set permanent root password
-  mysql_user:
-    login_user: root
-    login_password: "{{ mysql_temp_password.stdout }}"
-    name: root
-    password: "{{ prestashop_mysql_root_password }}"
-    host: localhost
-    plugin: mysql_native_password
-    state: present
-  #no_log: true
-  become: yes
+    - name: Set root password (when no password exists)
+      mysql_user:
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        name: root
+        password: "{{ prestashop_mysql_root_password }}"
+        host: localhost
+        plugin: mysql_native_password
+        state: present
+      when: root_access.rc != 0
+      no_log: true
+      become: yes
+
+    - name: Update root password (when password exists)
+      mysql_user:
+        login_user: root
+        login_password: "{{ prestashop_mysql_root_password }}"
+        name: root
+        password: "{{ prestashop_mysql_root_password }}"
+        host: localhost
+        state: present
+      when: root_access.rc == 0
+      no_log: true
+      become: yes
   tags: mysql
 
 - name: Remove insecure defaults
   mysql_user:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
     name: ""
     host: localhost
     state: absent
@@ -57,8 +70,7 @@
 
 - name: Remove test database
   mysql_db:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
     name: test
     state: absent
   no_log: true
@@ -67,8 +79,7 @@
 
 - name: Create PrestaShop database
   mysql_db:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
     name: "{{ prestashop_db_name }}"
     encoding: utf8mb4
     collation: utf8mb4_unicode_ci
@@ -79,8 +90,7 @@
 
 - name: Create application database user
   mysql_user:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
     name: "{{ prestashop_admin_db_user }}"
     password: "{{ prestashop_admin_db_password }}"
     host: "%"
@@ -92,8 +102,7 @@
 
 - name: Apply privilege changes
   mysql_query:
-    login_user: root
-    login_password: "{{ prestashop_mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
     query: "FLUSH PRIVILEGES"
   no_log: true
   become: yes
