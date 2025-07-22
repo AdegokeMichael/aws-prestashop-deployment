@@ -37,6 +37,11 @@ resource "aws_instance" "prestashop_vm" {
   key_name                    = var.key_name
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.prestashop_sg.id]
+  user_data = <<-EOF
+              #!/bin/bash
+              debconf-set-selections <<< "mysql-server mysql-server/root_password password ${var.mysql_root_password}"
+              debconf-set-selections <<< "mysql-server mysql-server/root_password_again password ${var.mysql_root_password}"
+              EOF
 
   tags = {
     Name = "Prestashop-VM"
