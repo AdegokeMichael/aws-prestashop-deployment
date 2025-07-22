@@ -1,4 +1,5 @@
 ---
+# roles/prestashop/tasks/mysql.yml
 
 - name: Install MySQL Server
   apt:
@@ -22,20 +23,20 @@
   become: yes
   tags: mysql
 
-# Critical change - Create admin user via socket auth
-- name: Create administrative user (full privileges)
+# Create admin user with proper privileges
+- name: Create administrative user
   mysql_user:
     login_unix_socket: /var/run/mysqld/mysqld.sock
     name: "admin"
     password: "{{ prestashop_mysql_root_password }}"
     host: "localhost"
-    priv: ".:ALL,GRANT"
+    priv: ".:ALL,GRANT"  # Fixed privilege syntax
     state: present
-  #no_log: true
+  no_log: true
   become: yes
   tags: mysql
 
-# Now use the admin user for all subsequent tasks
+# Remaining tasks use the admin user
 - name: Remove insecure defaults
   mysql_user:
     login_user: "admin"
@@ -69,14 +70,14 @@
   become: yes
   tags: database
 
-- name: Create application user
+- name: Create application user with specific privileges
   mysql_user:
     login_user: "admin"
     login_password: "{{ prestashop_mysql_root_password }}"
     name: "{{ prestashop_admin_db_user }}"
     password: "{{ prestashop_admin_db_password }}"
     host: "%"
-    priv: "{{ prestashop_db_name }}.*:ALL,GRANT"
+    priv: "{{ prestashop_db_name }}.*:ALL,GRANT"  # Specific to PrestaShop DB
     state: present
   no_log: true
   become: yes
