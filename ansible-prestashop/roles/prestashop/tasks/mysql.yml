@@ -16,8 +16,7 @@
     y
     y
     EOF
-  become: yes
-  when: "'mysql-server' in ansible_facts.packages"    
+  become: yes   
 
 - name: Start MySQL Service
   service:
