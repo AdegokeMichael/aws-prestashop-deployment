@@ -28,9 +28,11 @@
   mysql_user:
     login_user: root
     name: root
-    password: "{{ prestashop_mysql_root_pssword }}"
+    password: "{{ prestashop_mysql_root_password }}"
     host_all: true
     state: present
+  no_log: true
+  become: yes  
 
 - name: Create Prestashop Database
   mysql_db:
