@@ -1,4 +1,4 @@
 [prestashop]
-<<elastic IP>> 
+54.89.13.132 
 ansible_user=ubuntu
 ansible_ssh_private_key_file=C:/Users/hp/Downloads/testkey.pem
