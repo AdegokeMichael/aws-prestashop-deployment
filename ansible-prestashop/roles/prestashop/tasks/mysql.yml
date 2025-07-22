@@ -4,25 +4,16 @@
   apt:
     name: mysql-server
     state: present
+  become: yes
+  tags: mysql
 
-- name: Secure MySQL installation
-  shell: |
-    sudo mysql_secure_installation <<EOF
-    n
-    n
-    n
-    y
-    y
-    y
-    y
-    EOF
-  become: yes   
-
-- name: Start MySQL Service
+- name: Ensure MySQL service is running
   service:
     name: mysql
     state: started
-    enabled: true
+    enabled: yes
+  become: yes
+  tags: mysql
 
 - name: Install MySQL Python client
   apt:
@@ -33,34 +24,109 @@
   until: pymysql_install is succeeded
   retries: 3
   delay: 10
+  tags: mysql
 
 - name: Verify PyMySQL installation
   command: python3 -c "import pymysql"
   become: yes
   changed_when: false
+  tags: mysql
 
-- name: Set MySQL Root Password
-  mysql_user:  # MUST be lowercase
-    login_unix_socket: /var/run/mysqld/mysqld.sock  # Critical addition
+# Secure MySQL installation using native Ansible modules
+- name: Set root password via socket (initial setup)
+  mysql_user:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
     name: root
     password: "{{ prestashop_mysql_root_password }}"
-    host_all: true
+    host: localhost
     state: present
   no_log: true
   become: yes
+  tags: mysql
 
+- name: Remove anonymous users
+  mysql_user:
+    login_user: root
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: ''
+    host: localhost
+    state: absent
+  no_log: true
+  become: yes
+  tags: mysql
+
+- name: Remove test database
+  mysql_db:
+    login_user: root
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: test
+    state: absent
+  no_log: true
+  become: yes
+  tags: mysql
+
+- name: Disable remote root login
+  mysql_user:
+    login_user: root
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: root
+    host: "%"
+    state: absent
+  no_log: true
+  become: yes
+  tags: mysql
+
+# PrestaShop database setup
 - name: Create Prestashop Database
   mysql_db:
     login_user: root
-    login_password: "{{prestashop_mysql_root_password}}"
-    name: "{{prestashop_db_name}}"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: "{{ prestashop_db_name }}"
     state: present
+    encoding: utf8mb4
+    collation: utf8mb4_unicode_ci
+  no_log: true
+  become: yes
+  tags: database
 
-- name: Create MySQL user '{{prestashop_admin_db_user}}' with privileges on Prestashop database
+- name: Create MySQL user for Prestashop
   mysql_user:
     login_user: root
-    login_password: "{{prestashop_mysql_root_password}}"
-    name: "{{prestashop_admin_db_user}}"
-    password: "{{prestashop_admin_db_password}}"
-    priv: "{{prestashop_db_name}}.*:ALL"
+    login_password: "{{ prestashop_mysql_root_password }}"
+    name: "{{ prestashop_admin_db_user }}"
+    password: "{{ prestashop_admin_db_password }}"
+    host: "%"
+    priv: "{{ prestashop_db_name }}.*:ALL,GRANT"
     state: present
+  no_log: true
+  become: yes
+  tags: database
+
+- name: Flush privileges
+  mysql_query:
+    login_user: root
+    login_password: "{{ prestashop_mysql_root_password }}"
+    query: "FLUSH PRIVILEGES"
+  no_log: true
+  become: yes
+  tags: database
+
+# Verification tasks
+- name: Verify MySQL root access
+  command: >
+    mysql -u root -p"{{ prestashop_mysql_root_password }}"
+    -e "SELECT 1"
+  changed_when: false
+  no_log: true
+  become: yes
+  tags: verify
+
+- name: Verify Prestashop database user
+  command: >
+    mysql -u "{{ prestashop_admin_db_user }}"
+    -p"{{ prestashop_admin_db_password }}"
+    -e "SHOW DATABASES"
+  changed_when: false
+  no_log: true
+  become: yes
+  tags: verify
