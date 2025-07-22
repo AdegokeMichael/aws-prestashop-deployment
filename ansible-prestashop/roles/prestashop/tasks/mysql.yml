@@ -83,7 +83,7 @@
         mysql -e "FLUSH PRIVILEGES; ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ prestashop_mysql_root_password }}';" &&
         sudo pkill mysqld_safe &&
         sudo systemctl start mysql
-      no_log: true
+      #no_log: true
       become: yes
       when: auth_attempt2 is failed
 
