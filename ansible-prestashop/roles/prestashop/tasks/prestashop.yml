@@ -1,24 +1,39 @@
 ---
-- name: Download Prestashop
+- name: Install unzip and curl
+  apt:
+    name:
+      - unzip
+      - curl
+    state: present
+    update_cache: yes
+
+- name: Ensure web root exists
+  file:
+    path: /var/www/html
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: '0755'
+
+- name: Download PrestaShop 8.1.4
   get_url:
-    url:
-      https://download.prestashop.com/download/releases/prestashop_8.1.2.zip
+    url: https://github.com/PrestaShop/PrestaShop/releases/download/8.1.4/prestashop_8.1.4.zip
     dest: /tmp/prestashop.zip
 
-- name: Unzip Prestashop
+- name: Unzip PrestaShop into web root
   unarchive:
     src: /tmp/prestashop.zip
     dest: /var/www/html/
     remote_src: yes
-    extra_opts: ["-o"]
+    extra_opts: [ '-o' ]
 
-- name: Set Permissions
-  file: 
-    path: /var/www/html/
+- name: Set permissions on web root
+  file:
+    path: /var/www/html
     recurse: yes
     owner: www-data
     group: www-data
-    mode: '0755'
+
 
 - name: Restart Apache 
   meta: flush_handlers

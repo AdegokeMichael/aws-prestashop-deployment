@@ -5,6 +5,7 @@
   apt:
     name: mysql-server
     state: present
+    update_cache: yes
   become: yes
   tags: mysql
 
@@ -23,40 +24,27 @@
   become: yes
   tags: mysql
 
-# Create dedicated PrestaShop database (no admin user needed)
+- name: Set root password and remove anonymous users (Ubuntu default: no password)
+  mysql_secure_installation:
+    login_user: root
+    login_password: ''
+    root_password: "{{ mysql_root_password }}"
+    remove_anonymous_user: yes
+    disallow_root_login_remotely: yes
+    remove_test_database: yes
+    state: present
+
 - name: Create PrestaShop database
-  community.mysql.mysql_query:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
-    query: |
-      CREATE DATABASE IF NOT EXISTS {{ prestashop_db_name }}
-      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-  become: yes
-  tags: database
+  mysql_db:
+    name: "{{ prestashop_db_name }}"
+    state: present
+    encoding: utf8mb4
+    collation: utf8mb4_unicode_ci
 
-- name: Create application user with limited privileges
-  community.mysql.mysql_query:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
-    query: |
-      CREATE USER IF NOT EXISTS '{{ prestashop_db_user }}'@'localhost'
-      IDENTIFIED BY '{{ prestashop_db_password }}';
-      
-      GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP,
-      REFERENCES, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE,
-      CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE
-      ON {{ prestashop_db_name }}.*
-      TO '{{ prestashop_db_user }}'@'localhost';
-      
-      FLUSH PRIVILEGES;
-  become: yes
-  tags: database
-
-# Optional security hardening
-- name: Remove insecure defaults
-  community.mysql.mysql_query:
-    login_unix_socket: /var/run/mysqld/mysqld.sock
-    query: |
-      DELETE FROM mysql.user WHERE User = '';
-      DROP DATABASE IF EXISTS test;
-      FLUSH PRIVILEGES;
-  become: yes
-  tags: mysql
+- name: Create PrestaShop DB user
+  mysql_user:
+    name: "{{ prestashop_db_user }}"
+    password: "{{ prestashop_db_password }}"
+    priv: "{{ prestashop_db_name }}.*:ALL"
+    host: localhost
+    state: present
