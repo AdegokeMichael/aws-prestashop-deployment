@@ -33,7 +33,38 @@
     recurse: yes
     owner: www-data
     group: www-data
+    mode: '0755'
 
 
-- name: Restart Apache 
-  meta: flush_handlers
+- name: Remove Apache default index.html
+  file:
+    path: /var/www/html/index.html
+    state: absent
+
+- name: Move PrestaShop contents from subfolder if it exists
+  command: >
+    mv /var/www/html/prestashop/* /var/www/html/
+  args:
+    removes: /var/www/html/prestashop/index.php
+  ignore_errors: yes
+
+- name: Move PrestaShop hidden files (e.g., .htaccess) if any
+  command: >
+    sh -c 'mv /var/www/html/prestashop/.* /var/www/html/ 2>/dev/null || true'
+  args:
+    warn: false
+  ignore_errors: yes
+
+- name: Remove leftover prestashop directory
+  file:
+    path: /var/www/html/prestashop
+    state: absent
+  ignore_errors: yes
+
+
+- name: Restart Apache after PrestaShop deployment
+  service:
+    name: apache2
+    meta: flush_handlers
+    state: restarted
+
