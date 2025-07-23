@@ -24,7 +24,7 @@
   become: yes
   tags: mysql
 
-- name: Set root password and remove anonymous users (Ubuntu default: no password)
+- name: Set root password and remove anonymous users
   mysql_secure_installation:
     login_user: root
     login_password: ''
