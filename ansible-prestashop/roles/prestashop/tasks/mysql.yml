@@ -24,15 +24,43 @@
   become: yes
   tags: mysql
 
-- name: Set root password and remove anonymous users
-  mysql_secure_installation:
-    login_user: root
-    login_password: ''
-    root_password: "{{ mysql_root_password }}"
-    remove_anonymous_user: yes
-    disallow_root_login_remotely: yes
-    remove_test_database: yes
+- name: Set MySQL root password (only if not already set)
+  mysql_user:
+    name: root
+    host: localhost
+    password: "{{ mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    check_implicit_admin: true
     state: present
+  ignore_errors: yes  # This allows idempotency — skips if password already set
+
+- name: Remove anonymous MySQL users
+  mysql_user:
+    name: ''
+    host_all: yes
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    state: absent
+
+- name: Remove MySQL test database
+  mysql_db:
+    name: test
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    state: absent
+
+- name: Disallow root login remotely
+  mysql_user:
+    name: root
+    host: "{{ item }}"
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    state: absent
+  loop:
+    - "{{ ansible_hostname }}"
+    - '%'
+  ignore_errors: yes
+
 
 - name: Create PrestaShop database
   mysql_db:
@@ -40,6 +68,8 @@
     state: present
     encoding: utf8mb4
     collation: utf8mb4_unicode_ci
+    login_user: root
+    login_password: "{{prestashop_db_password}}"
 
 - name: Create PrestaShop DB user
   mysql_user:
@@ -48,3 +78,5 @@
     priv: "{{ prestashop_db_name }}.*:ALL"
     host: localhost
     state: present
+    login_user: root
+    login_password: "{{mysql_root_password}}"
